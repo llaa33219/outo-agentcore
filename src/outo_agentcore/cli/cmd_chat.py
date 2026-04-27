@@ -58,7 +58,7 @@ def cmd_chat(args) -> None:
     session_mgr = SessionManager(sessions_dir)
 
     try:
-        entry_agent = router.get_agent(args.agent)
+        entry_agent = router.get_agent(args.agent or config.default_agent)
     except Exception as e:
         print(f"Error: {e}")
         return

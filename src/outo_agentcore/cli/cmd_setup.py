@@ -13,7 +13,6 @@ def cmd_setup(args):
         config = AppConfig(
             providers={},
             agents={},
-            sub_agents=[],
             skills_dir=str(config_dir / "skills")
         )
 
@@ -31,12 +30,8 @@ def cmd_setup(args):
     if args.agent_md:
         config.agents["main"] = args.agent_md
 
-    if args.sub_agents:
-        config.sub_agents = args.sub_agents
-        for name in args.sub_agents:
-            if name not in config.agents:
-                agent_path = config_dir / "agents" / f"{name}.md"
-                config.agents[name] = str(agent_path)
+    if args.default_agent:
+        config.default_agent = args.default_agent
 
     save_config(config_path, config)
     print(f"Configuration saved to {config_path}")

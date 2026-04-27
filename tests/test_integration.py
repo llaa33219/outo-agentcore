@@ -36,7 +36,7 @@ async def test_full_flow_mock_llm(tmp_path):
     config = AppConfig(
         providers={"default": ProviderConfig(kind="openai", model="gpt-4", api_key="test")},
         agents={"main": str(agent_md)},
-        sub_agents=[],
+        default_agent="main",
         skills_dir=str(config_dir / "skills")
     )
     save_config(config_dir / "config.json", config)

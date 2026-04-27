@@ -17,7 +17,7 @@ def load_config(path: Path) -> AppConfig:
     return AppConfig(
         providers=providers,
         agents=data.get("agents", {}),
-        sub_agents=data.get("sub_agents", []),
+        default_agent=data.get("default_agent", "main"),
         skills_dir=data.get("skills_dir", "~/.outoac/skills/")
     )
 
@@ -34,7 +34,7 @@ def save_config(path: Path, config: AppConfig) -> None:
             for name, pc in config.providers.items()
         },
         "agents": config.agents,
-        "sub_agents": config.sub_agents,
+        "default_agent": config.default_agent,
         "skills_dir": config.skills_dir
     }
 

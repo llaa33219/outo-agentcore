@@ -39,7 +39,7 @@ outoac setup \
   --api-key your-key \
   --model llama3 \
   --agent-md ~/.outoac/agents/main.md \
-  --sub-agents researcher writer reviewer coder tester
+  --default-agent main
 ```
 
 ### 2. Create agent definitions
@@ -99,12 +99,12 @@ outoac chat "Tell me more" --session <session-id>
 
 | Argument | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `--base-url` | Provider API base URL | - | `https://api.minimax.io/v1` |
+| `--base-url` | Provider API base URL | - | `http://localhost:11434/v1` |
 | `--api-key` | API key for provider | - | `sk-xxx` |
-| `--model` | Default model name | - | `MiniMax-M2.7` |
+| `--model` | Default model name | - | `llama3` |
 | `--provider-name` | Provider name | `default` | `openai` |
 | `--agent-md` | Path to main agent markdown | - | `~/.outoac/agents/main.md` |
-| `--sub-agents` | Sub-agent names | - | `researcher writer reviewer` |
+| `--default-agent` | Default agent for chat | `main` | `researcher` |
 
 ### Chat Options
 
@@ -143,7 +143,7 @@ Config file: `~/.outoac/config.json`
     "coder": "~/.outoac/agents/coder.md",
     "tester": "~/.outoac/agents/tester.md"
   },
-  "sub_agents": ["researcher", "writer", "reviewer", "coder", "tester"],
+  "default_agent": "main",
   "skills_dir": "~/.outoac/skills/"
 }
 ```
@@ -206,7 +206,7 @@ outoac setup \
   --api-key your-key \
   --model llama3 \
   --agent-md ~/.outoac/agents/main.md \
-  --sub-agents researcher writer
+  --default-agent main
 ```
 
 Now main agent can call researcher and writer using `call_agent` tool.

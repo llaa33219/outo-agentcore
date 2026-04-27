@@ -16,7 +16,7 @@ def test_load_valid_config(tmp_path):
             }
         },
         "agents": {"main": "~/agents/main.md"},
-        "sub_agents": ["researcher"],
+        "default_agent": "main",
         "skills_dir": "~/.outoac/skills/"
     }
     config_file = tmp_path / "config.json"
@@ -27,14 +27,14 @@ def test_load_valid_config(tmp_path):
     assert config.providers["default"].kind == "openai"
     assert config.providers["default"].model == "gpt-4o"
     assert config.agents["main"] == "~/agents/main.md"
-    assert config.sub_agents == ["researcher"]
+    assert config.default_agent == "main"
 
 
 def test_save_and_reload(tmp_path):
     config = AppConfig(
         providers={"test": ProviderConfig(kind="openai", model="gpt-4")},
         agents={"main": "/path/to/main.md"},
-        sub_agents=[],
+        default_agent="main",
         skills_dir="/skills"
     )
     config_file = tmp_path / "config.json"
@@ -43,6 +43,7 @@ def test_save_and_reload(tmp_path):
     loaded = load_config(config_file)
     assert loaded.providers["test"].model == "gpt-4"
     assert loaded.agents["main"] == "/path/to/main.md"
+    assert loaded.default_agent == "main"
 
 
 def test_load_missing_file_raises(tmp_path):
@@ -58,8 +59,9 @@ def test_load_invalid_json_raises(tmp_path):
 
 
 def test_default_skills_dir():
-    config = AppConfig(providers={}, agents={}, sub_agents=[])
+    config = AppConfig(providers={}, agents={})
     assert config.skills_dir == "~/.outoac/skills/"
+    assert config.default_agent == "main"
 
 
 def test_provider_config_defaults():

@@ -15,7 +15,7 @@ def main():
     setup_parser.add_argument("--model", help="Default model name")
     setup_parser.add_argument("--provider-name", default="default", help="Provider name")
     setup_parser.add_argument("--agent-md", help="Path to main agent markdown file")
-    setup_parser.add_argument("--sub-agents", nargs="*", help="Sub-agent names")
+    setup_parser.add_argument("--default-agent", default="main", help="Default agent name")
 
     # chat command (will be added later)
     chat_parser = subparsers.add_parser("chat", help="Start a chat session")

@@ -13,5 +13,5 @@ class ProviderConfig:
 class AppConfig:
     providers: dict[str, ProviderConfig]
     agents: dict[str, str]
-    sub_agents: list[str]
+    default_agent: str = "main"
     skills_dir: str = "~/.outoac/skills/"
