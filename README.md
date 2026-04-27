@@ -37,7 +37,7 @@ pip install outo-agentcore
 outoac setup \
   --base-url http://localhost:11434/v1 \
   --api-key your-key \
-  --default-model llama3 \
+  --default-model llama4:scout \
   --agent-md ~/.outoac/agents/main.md \
   --default-agent main
 ```
@@ -101,7 +101,7 @@ outoac chat "Tell me more" --session <session-id>
 |----------|-------------|---------|---------|
 | `--base-url` | Provider API base URL | - | `http://localhost:11434/v1` |
 | `--api-key` | API key for provider | - | `sk-xxx` |
-| `--default-model` | Default model for provider | - | `llama3` |
+| `--default-model` | Default model for provider | - | `llama4:scout` |
 | `--provider-name` | Provider name | `default` | `openai` |
 | `--agent-md` | Path to main agent markdown | - | `~/.outoac/agents/main.md` |
 | `--default-agent` | Default agent for chat | `main` | `researcher` |
@@ -132,7 +132,7 @@ Config file: `~/.outoac/config.json`
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "your-key",
-      "default_model": "llama3"
+      "default_model": "llama4:scout"
     }
   },
   "agents": {
@@ -204,12 +204,23 @@ Setup with all agents:
 outoac setup \
   --base-url http://localhost:11434/v1 \
   --api-key your-key \
-  --default-model llama3 \
+  --default-model llama4:scout \
   --agent-md ~/.outoac/agents/main.md \
   --default-agent main
 ```
 
 Now main agent can call researcher and writer using `call_agent` tool.
+
+## Supported Providers
+
+| Provider | Base URL | Default Model |
+|----------|----------|---------------|
+| OpenAI | `https://api.openai.com/v1` | `gpt-5.5` |
+| Anthropic | `https://api.anthropic.com/v1` | `claude-sonnet-4-6` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | `gemini-3-1-pro` |
+| Ollama | `http://localhost:11434/v1` | `llama4:scout` |
+| LM Studio | `http://localhost:1234/v1` | (local model) |
+| vLLM | `http://localhost:8000/v1` | (local model) |
 
 ## Built-in Tools
 
