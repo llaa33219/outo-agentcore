@@ -35,7 +35,9 @@ def cmd_chat(args) -> None:
         if md_path.exists():
             parsed = parse_agent_md(md_path)
             provider_name = parsed.get("provider", list(config.providers.keys())[0])
-            model = parsed.get("model", config.providers[provider_name].model)
+            provider = config.providers.get(provider_name)
+            default_model = provider.default_model if provider else ""
+            model = parsed.get("model", default_model)
             agents.append(Agent(
                 name=name,
                 instructions=parsed.get("instructions", ""),

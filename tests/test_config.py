@@ -12,7 +12,7 @@ def test_load_valid_config(tmp_path):
                 "kind": "openai",
                 "base_url": "https://api.openai.com/v1",
                 "api_key": "sk-xxx",
-                "model": "gpt-4o"
+                "default_model": "gpt-4o"
             }
         },
         "agents": {"main": "~/agents/main.md"},
@@ -25,14 +25,14 @@ def test_load_valid_config(tmp_path):
     config = load_config(config_file)
     assert "default" in config.providers
     assert config.providers["default"].kind == "openai"
-    assert config.providers["default"].model == "gpt-4o"
+    assert config.providers["default"].default_model == "gpt-4o"
     assert config.agents["main"] == "~/agents/main.md"
     assert config.default_agent == "main"
 
 
 def test_save_and_reload(tmp_path):
     config = AppConfig(
-        providers={"test": ProviderConfig(kind="openai", model="gpt-4")},
+        providers={"test": ProviderConfig(kind="openai", default_model="gpt-4")},
         agents={"main": "/path/to/main.md"},
         default_agent="main",
         skills_dir="/skills"
@@ -41,7 +41,7 @@ def test_save_and_reload(tmp_path):
     save_config(config_file, config)
 
     loaded = load_config(config_file)
-    assert loaded.providers["test"].model == "gpt-4"
+    assert loaded.providers["test"].default_model == "gpt-4"
     assert loaded.agents["main"] == "/path/to/main.md"
     assert loaded.default_agent == "main"
 
@@ -69,4 +69,4 @@ def test_provider_config_defaults():
     assert pc.kind == "openai"
     assert pc.base_url == ""
     assert pc.api_key == ""
-    assert pc.model == ""
+    assert pc.default_model == ""

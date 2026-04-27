@@ -12,7 +12,7 @@ def main():
     setup_parser = subparsers.add_parser("setup", help="Configure providers and agents")
     setup_parser.add_argument("--base-url", help="Provider base URL")
     setup_parser.add_argument("--api-key", help="Provider API key")
-    setup_parser.add_argument("--model", help="Default model name")
+    setup_parser.add_argument("--default-model", help="Default model for provider")
     setup_parser.add_argument("--provider-name", default="default", help="Provider name")
     setup_parser.add_argument("--agent-md", help="Path to main agent markdown file")
     setup_parser.add_argument("--default-agent", default="main", help="Default agent name")

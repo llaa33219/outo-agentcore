@@ -6,7 +6,7 @@ class ProviderConfig:
     kind: str = "openai"
     base_url: str = ""
     api_key: str = ""
-    model: str = ""
+    default_model: str = ""
 
 
 @dataclass

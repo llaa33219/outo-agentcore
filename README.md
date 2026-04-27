@@ -37,7 +37,7 @@ pip install outo-agentcore
 outoac setup \
   --base-url http://localhost:11434/v1 \
   --api-key your-key \
-  --model llama3 \
+  --default-model llama3 \
   --agent-md ~/.outoac/agents/main.md \
   --default-agent main
 ```
@@ -101,7 +101,7 @@ outoac chat "Tell me more" --session <session-id>
 |----------|-------------|---------|---------|
 | `--base-url` | Provider API base URL | - | `http://localhost:11434/v1` |
 | `--api-key` | API key for provider | - | `sk-xxx` |
-| `--model` | Default model name | - | `llama3` |
+| `--default-model` | Default model for provider | - | `llama3` |
 | `--provider-name` | Provider name | `default` | `openai` |
 | `--agent-md` | Path to main agent markdown | - | `~/.outoac/agents/main.md` |
 | `--default-agent` | Default agent for chat | `main` | `researcher` |
@@ -132,7 +132,7 @@ Config file: `~/.outoac/config.json`
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "your-key",
-      "model": "llama3"
+      "default_model": "llama3"
     }
   },
   "agents": {
@@ -204,7 +204,7 @@ Setup with all agents:
 outoac setup \
   --base-url http://localhost:11434/v1 \
   --api-key your-key \
-  --model llama3 \
+  --default-model llama3 \
   --agent-md ~/.outoac/agents/main.md \
   --default-agent main
 ```

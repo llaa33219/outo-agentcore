@@ -29,7 +29,7 @@ def save_config(path: Path, config: AppConfig) -> None:
                 "kind": pc.kind,
                 "base_url": pc.base_url,
                 "api_key": pc.api_key,
-                "model": pc.model
+                "default_model": pc.default_model
             }
             for name, pc in config.providers.items()
         },

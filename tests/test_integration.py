@@ -34,7 +34,7 @@ async def test_full_flow_mock_llm(tmp_path):
     agent_md.write_text("# Test Agent\n\nYou are a test agent.")
     
     config = AppConfig(
-        providers={"default": ProviderConfig(kind="openai", model="gpt-4", api_key="test")},
+        providers={"default": ProviderConfig(kind="openai", api_key="test", default_model="gpt-4")},
         agents={"main": str(agent_md)},
         default_agent="main",
         skills_dir=str(config_dir / "skills")

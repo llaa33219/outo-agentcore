@@ -16,14 +16,14 @@ def cmd_setup(args):
             skills_dir=str(config_dir / "skills")
         )
 
-    if args.base_url or args.api_key or args.model:
+    if args.base_url or args.api_key or args.default_model:
         provider = config.providers.get(args.provider_name, ProviderConfig())
         if args.base_url:
             provider.base_url = args.base_url
         if args.api_key:
             provider.api_key = args.api_key
-        if args.model:
-            provider.model = args.model
+        if args.default_model:
+            provider.default_model = args.default_model
         provider.kind = "openai"
         config.providers[args.provider_name] = provider
 
