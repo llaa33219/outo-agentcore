@@ -26,7 +26,11 @@
 ## Installation
 
 ```bash
+# pip
 pip install outo-agentcore
+
+# uv (recommended)
+uv tool install outo-agentcore
 ```
 
 ## Quick Start
