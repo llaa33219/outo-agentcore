@@ -33,6 +33,22 @@ pip install outo-agentcore
 uv tool install outo-agentcore
 ```
 
+## Uninstall
+
+```bash
+# pip
+pip uninstall outo-agentcore
+
+# uv
+uv tool uninstall outo-agentcore
+```
+
+To remove all data:
+
+```bash
+rm -rf ~/.outoac
+```
+
 ## Quick Start
 
 ### 1. Setup
