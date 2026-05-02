@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from outo_agentcore.core.agent import Agent
 from outo_agentcore.core.provider import Provider
+from outo_agentcore.core.skill import Skill
 from outo_agentcore.core.tool import BashTool
 from outo_agentcore.core.context import Context
 from outo_agentcore.providers import get_backend, LLMResponse
@@ -18,10 +19,11 @@ class RoutingError(Exception):
 
 
 class Router:
-    def __init__(self, agents: list[Agent], tools: list, providers: list[Provider]):
+    def __init__(self, agents: list[Agent], tools: list, providers: list[Provider], skills: list[Skill] | None = None):
         self._agents = {a.name: a for a in agents}
         self._providers = {p.name: p for p in providers}
         self._tools = {t.name: t for t in tools}
+        self._skills = skills or []
 
     def get_agent(self, name: str) -> Agent:
         if name not in self._agents:
@@ -66,6 +68,13 @@ class Router:
             parts.append("- wiki_record: Record information to the wiki knowledge base.")
         if "wiki_search" in self._tools:
             parts.append("- wiki_search: Search the wiki knowledge base for information.")
+
+        if self._skills:
+            parts.append("\nAvailable skills:")
+            for skill in self._skills:
+                parts.append(f"- {skill.name}: {skill.description}")
+            parts.append("\nTo use a skill, read its SKILL.md file when the task matches its description.")
+            parts.append("Example: bash(command=\"cat ~/.outoac/skills/<skill-name>/SKILL.md\")")
 
         parts.append("\nIMPORTANT: You MUST call the finish tool to return your final result.")
         parts.append("Plain text responses are NOT delivered to the caller.")

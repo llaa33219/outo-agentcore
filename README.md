@@ -18,6 +18,7 @@
 ## Features
 
 - **Agent support**: Agents can call each other recursively
+- **Skills support**: [Agent Skills specification](https://agentskills.io/specification) compliant - reusable instruction packages
 - **OpenAI-compatible**: Works with OpenAI, MiniMax, Ollama, LM Studio, vLLM, etc.
 - **Session persistence**: Continue conversations across runs
 - **Bash execution**: Built-in shell command tool
@@ -320,6 +321,38 @@ When enabled, agents have access to:
 - Search for previously discussed topics
 - Maintain context for long-running projects
 
+## Skills
+
+Skills are reusable instruction packages that extend agent capabilities. They follow the [Agent Skills specification](https://agentskills.io/specification).
+
+### Creating Skills
+
+```bash
+mkdir -p ~/.outoac/skills/my-skill
+```
+
+Create `~/.outoac/skills/my-skill/SKILL.md`:
+
+```markdown
+---
+name: my-skill
+description: What this skill does and when to use it.
+---
+
+# Instructions
+
+Your detailed instructions go here...
+```
+
+### How Skills Work
+
+- Skills are automatically discovered from `~/.outoac/skills/`
+- Agents see all available skills in their system prompt
+- Agents automatically activate skills based on task description
+- Skills are loaded progressively (metadata → instructions → resources)
+
+See [Skills Documentation](docs/skills.md) for details.
+
 ## Built-in Tools
 
 | Tool | Description |
@@ -342,7 +375,11 @@ When enabled, agents have access to:
 │   ├── reviewer.md
 │   ├── coder.md
 │   └── tester.md
-├── skills/              # Skill definitions (future)
+├── skills/              # Skill definitions (Agent Skills spec)
+│   ├── code-review/
+│   │   └── SKILL.md
+│   └── git-workflow/
+│       └── SKILL.md
 ├── sessions/            # Session persistence
 │   └── <session-id>.json
 └── wiki/                # Wiki knowledge base (when enabled)

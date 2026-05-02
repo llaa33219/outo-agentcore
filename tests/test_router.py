@@ -1,7 +1,9 @@
 import pytest
+from pathlib import Path
 from outo_agentcore.core.router import Router, CALL_AGENT, FINISH
 from outo_agentcore.core.agent import Agent
 from outo_agentcore.core.provider import Provider
+from outo_agentcore.core.skill import Skill
 from outo_agentcore.core.tool import BashTool
 from outo_agentcore.core.context import Context
 from outo_agentcore.providers import LLMResponse
@@ -82,3 +84,44 @@ def test_tool_schemas_contains_finish():
 def test_constants():
     assert CALL_AGENT == "call_agent"
     assert FINISH == "finish"
+
+
+def test_router_with_skills():
+    agent = Agent(name="main", instructions="test", model="gpt-4", provider="openai")
+    skill = Skill(
+        name="code-review",
+        description="Code review guidelines",
+        instructions="Check security...",
+        path=Path("/tmp/code-review")
+    )
+    router = Router([agent], [BashTool()], [Provider(name="openai", kind="openai")], skills=[skill])
+    prompt = router.build_system_prompt(agent)
+    assert "code-review" in prompt
+    assert "Code review guidelines" in prompt
+
+
+def test_router_skills_in_system_prompt():
+    agent = Agent(name="main", instructions="test", model="gpt-4", provider="openai")
+    skill1 = Skill(name="skill-1", description="First skill", instructions="...", path=Path("/tmp/s1"))
+    skill2 = Skill(name="skill-2", description="Second skill", instructions="...", path=Path("/tmp/s2"))
+    router = Router([agent], [BashTool()], [Provider(name="openai", kind="openai")], skills=[skill1, skill2])
+    prompt = router.build_system_prompt(agent)
+    assert "skill-1" in prompt
+    assert "First skill" in prompt
+    assert "skill-2" in prompt
+    assert "Second skill" in prompt
+    assert "SKILL.md" in prompt
+
+
+def test_router_no_skills():
+    agent = Agent(name="main", instructions="test", model="gpt-4", provider="openai")
+    router = Router([agent], [BashTool()], [Provider(name="openai", kind="openai")])
+    prompt = router.build_system_prompt(agent)
+    assert "Available skills" not in prompt
+
+
+def test_router_empty_skills():
+    agent = Agent(name="main", instructions="test", model="gpt-4", provider="openai")
+    router = Router([agent], [BashTool()], [Provider(name="openai", kind="openai")], skills=[])
+    prompt = router.build_system_prompt(agent)
+    assert "Available skills" not in prompt

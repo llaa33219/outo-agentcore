@@ -10,6 +10,7 @@ from outo_agentcore.core.runtime import Runtime
 from outo_agentcore.core.tool import BashTool
 from outo_agentcore.core.wiki_tools import WikiRecordTool, WikiSearchTool
 from outo_agentcore.parser.agent_md import parse_agent_md
+from outo_agentcore.parser.skill_md import discover_skills
 from outo_agentcore.sessions.manager import SessionManager, SessionLoadError
 
 
@@ -60,7 +61,10 @@ def cmd_chat(args) -> None:
         tools.append(WikiRecordTool(config.wiki))
         tools.append(WikiSearchTool(config.wiki))
 
-    router = Router(agents, tools, providers)
+    skills_dir = Path(config.skills_dir).expanduser()
+    skills = discover_skills(skills_dir)
+
+    router = Router(agents, tools, providers, skills=skills)
     runtime = Runtime(router)
 
     sessions_dir = Path.home() / ".outoac" / "sessions"
