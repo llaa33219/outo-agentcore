@@ -1,12 +1,21 @@
 import pytest
 from pathlib import Path
-from outo_agentcore.sessions.manager import SessionManager, SessionData
+from outo_agentcore.sessions.manager import SessionManager, SessionData, SessionLoadError
 
 
 def test_create_new_session(tmp_path):
     mgr = SessionManager(tmp_path)
     session = mgr.create(agent_name="main")
     assert session.session_id
+    assert session.created_at
+    assert session.messages == []
+    assert session.agent_name == "main"
+
+
+def test_create_session_with_specific_id(tmp_path):
+    mgr = SessionManager(tmp_path)
+    session = mgr.create(agent_name="main", session_id="custom-id-123")
+    assert session.session_id == "custom-id-123"
     assert session.created_at
     assert session.messages == []
     assert session.agent_name == "main"
@@ -28,6 +37,33 @@ def test_save_and_load_roundtrip(tmp_path):
 def test_load_nonexistent_returns_none(tmp_path):
     mgr = SessionManager(tmp_path)
     assert mgr.load("nonexistent-id") is None
+
+
+def test_load_empty_file_raises_error(tmp_path):
+    mgr = SessionManager(tmp_path)
+    session_file = tmp_path / "empty-session.json"
+    session_file.write_text("")
+    
+    with pytest.raises(SessionLoadError, match="corrupted"):
+        mgr.load("empty-session")
+
+
+def test_load_corrupted_json_raises_error(tmp_path):
+    mgr = SessionManager(tmp_path)
+    session_file = tmp_path / "corrupted-session.json"
+    session_file.write_text("{invalid json content")
+    
+    with pytest.raises(SessionLoadError, match="corrupted"):
+        mgr.load("corrupted-session")
+
+
+def test_load_invalid_format_raises_error(tmp_path):
+    mgr = SessionManager(tmp_path)
+    session_file = tmp_path / "bad-format-session.json"
+    session_file.write_text('{"wrong_field": "value"}')
+    
+    with pytest.raises(SessionLoadError, match="invalid format"):
+        mgr.load("bad-format-session")
 
 
 def test_list_sessions(tmp_path):

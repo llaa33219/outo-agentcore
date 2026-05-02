@@ -21,6 +21,7 @@
 - **OpenAI-compatible**: Works with OpenAI, MiniMax, Ollama, LM Studio, vLLM, etc.
 - **Session persistence**: Continue conversations across runs
 - **Bash execution**: Built-in shell command tool
+- **Wiki knowledge base**: Optional [OutoWiki](https://github.com/llaa33219/outowiki) integration for persistent knowledge management
 - **Simple CLI**: No complex TUI, just commands
 
 ## Installation
@@ -152,7 +153,8 @@ Config file: `~/.outoac/config.json`
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "your-key",
-      "default_model": "llama4:scout"
+      "default_model": "llama4:scout",
+      "max_output_tokens": 0
     }
   },
   "agents": {
@@ -164,9 +166,46 @@ Config file: `~/.outoac/config.json`
     "tester": "~/.outoac/agents/tester.md"
   },
   "default_agent": "main",
-  "skills_dir": "~/.outoac/skills/"
+  "skills_dir": "~/.outoac/skills/",
+  "wiki": {
+    "enabled": false,
+    "wiki_path": "~/.outoac/wiki/",
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "api_key": "",
+    "base_url": "",
+    "max_output_tokens": 0,
+    "debug": false
+  }
 }
 ```
+
+### Provider Settings
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `kind` | Provider type (openai, anthropic) | `openai` |
+| `base_url` | API endpoint URL | - |
+| `api_key` | API key for authentication | - |
+| `default_model` | Default model for agents | - |
+| `max_output_tokens` | Default max output tokens (auto-detected if 0) | `0` |
+
+**Note**: If `max_output_tokens` is `0` or not set, the system automatically retrieves the optimal value from the [LCW API](https://lcw-api.blp.sh/context-window). Agent-level settings override provider defaults.
+
+### Wiki Settings
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `enabled` | Enable wiki knowledge base tools | `false` |
+| `wiki_path` | Path to wiki directory | `~/.outoac/wiki/` |
+| `provider` | LLM provider for wiki operations | `openai` |
+| `model` | Model for wiki analysis | (empty, uses provider default) |
+| `api_key` | API key for wiki provider | (empty, uses provider key) |
+| `base_url` | Base URL for wiki provider | (empty, uses provider URL) |
+| `max_output_tokens` | Max tokens for wiki responses (auto-detected if not set) | `0` (auto) |
+| `debug` | Enable wiki debug logging | `false` |
+
+**Note**: If `max_output_tokens` is `0` or not set, the system automatically retrieves the optimal value from the [LCW API](https://lcw-api.blp.sh/context-window).
 
 ## Agent Markdown Format
 
@@ -177,6 +216,7 @@ Agent definitions use markdown with optional YAML frontmatter:
 model: MiniMax-M2.7
 provider: default
 temperature: 1
+max_output_tokens: 4000
 ---
 
 # Research Agent
@@ -189,10 +229,13 @@ and provide detailed analysis.
 - `model`: Model name (overrides provider default)
 - `provider`: Provider name to use
 - `temperature`: Sampling temperature (0.0-2.0)
+- `max_output_tokens`: Maximum output tokens (auto-detected if not set)
 
 **Body**:
 - First `#` heading becomes the agent's role
 - Rest becomes the agent's instructions
+
+**Note**: If `max_output_tokens` is not set, the system automatically retrieves the optimal value from the [LCW API](https://lcw-api.blp.sh/context-window).
 
 ## Agent Example
 
@@ -242,6 +285,41 @@ Now main agent can call researcher and writer using `call_agent` tool.
 | LM Studio | `http://localhost:1234/v1` | (local model) |
 | vLLM | `http://localhost:8000/v1` | (local model) |
 
+## Wiki Integration
+
+Outo-agentcore integrates with [OutoWiki](https://github.com/llaa33219/outowiki) for persistent knowledge management. When enabled, agents can record and search information across conversations.
+
+### Enable Wiki
+
+Add to `~/.outoac/config.json`:
+
+```json
+{
+  "wiki": {
+    "enabled": true,
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "api_key": "sk-..."
+  }
+}
+```
+
+**Note**: If the `wiki` section is not present in the config, wiki features are disabled by default.
+
+### Wiki Tools
+
+When enabled, agents have access to:
+
+- **`wiki_record`**: Save information to the wiki for future reference
+- **`wiki_search`**: Search the wiki for relevant knowledge
+
+### Use Cases
+
+- Remember user preferences across sessions
+- Build a knowledge base from conversations
+- Search for previously discussed topics
+- Maintain context for long-running projects
+
 ## Built-in Tools
 
 | Tool | Description |
@@ -249,6 +327,8 @@ Now main agent can call researcher and writer using `call_agent` tool.
 | `bash` | Execute shell commands |
 | `call_agent` | Call another agent |
 | `finish` | Return final result |
+| `wiki_record` | Record information to wiki (when enabled) |
+| `wiki_search` | Search wiki knowledge base (when enabled) |
 
 ## Directory Structure
 
@@ -263,8 +343,10 @@ Now main agent can call researcher and writer using `call_agent` tool.
 │   ├── coder.md
 │   └── tester.md
 ├── skills/              # Skill definitions (future)
-└── sessions/            # Session persistence
-    └── <session-id>.json
+├── sessions/            # Session persistence
+│   └── <session-id>.json
+└── wiki/                # Wiki knowledge base (when enabled)
+    └── *.md             # Wiki documents
 ```
 
 ## Development

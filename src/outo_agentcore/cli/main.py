@@ -22,6 +22,7 @@ def main():
     chat_parser.add_argument("message", help="Message to send")
     chat_parser.add_argument("--session", "-s", help="Session ID to continue")
     chat_parser.add_argument("--agent", "-a", default="main", help="Agent name to use")
+    chat_parser.add_argument("--max-messages", "-m", type=int, help="Max recent messages to attach from session")
     chat_parser.add_argument("--debug", action="store_true", help="Enable debug output")
 
     # sessions command

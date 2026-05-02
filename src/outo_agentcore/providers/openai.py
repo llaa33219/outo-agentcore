@@ -6,6 +6,7 @@ from outo_agentcore.providers import ProviderBackend, LLMResponse, Usage
 from outo_agentcore.core.context import Context, ToolCall, ContextMessage
 from outo_agentcore.core.agent import Agent
 from outo_agentcore.core.provider import Provider
+from outo_agentcore.core.token_utils import get_max_output_tokens
 
 
 class OpenAIBackend(ProviderBackend):
@@ -32,14 +33,16 @@ class OpenAIBackend(ProviderBackend):
         messages = _build_messages(context)
         openai_tools = _build_tools(tools) if tools else None
 
+        max_tokens = get_max_output_tokens(agent.model, agent.max_output_tokens)
+
         params: dict[str, Any] = {
             "model": agent.model,
             "messages": messages,
         }
         if openai_tools:
             params["tools"] = openai_tools
-        if agent.max_output_tokens:
-            params["max_completion_tokens"] = agent.max_output_tokens
+        if max_tokens:
+            params["max_completion_tokens"] = max_tokens
 
         response = await client.chat.completions.create(**params)
         choice = response.choices[0]

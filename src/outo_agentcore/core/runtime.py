@@ -27,13 +27,29 @@ class Runtime:
         self._router = router
         self._messages: list[Message] = []
     
-    async def execute(self, forward_message: str, agent: Agent) -> RunResult:
+    async def execute(
+        self,
+        forward_message: str,
+        agent: Agent,
+        history: list[dict] | None = None
+    ) -> RunResult:
         call_id = uuid.uuid4().hex
+        
+        if history:
+            for msg in history:
+                self._messages.append(Message(
+                    type=msg["type"],
+                    sender=msg["sender"],
+                    receiver=msg["receiver"],
+                    content=msg["content"],
+                    call_id=msg.get("call_id", uuid.uuid4().hex)
+                ))
+        
         self._messages.append(Message(
             type="forward", sender="user", receiver=agent.name,
             content=forward_message, call_id=call_id
         ))
-        output = await self._run_agent_loop(agent, forward_message, call_id, caller="user")
+        output = await self._run_agent_loop(agent, forward_message, call_id, caller="user", history=history)
         self._messages.append(Message(
             type="return", sender=agent.name, receiver="user",
             content=output, call_id=call_id
@@ -42,10 +58,14 @@ class Runtime:
     
     async def _run_agent_loop(
         self, agent: Agent, forward_message: str, call_id: str,
-        caller: str | None = None
+        caller: str | None = None, history: list[dict] | None = None
     ) -> str:
         system_prompt = self._router.build_system_prompt(agent, caller=caller)
         context = Context(system_prompt)
+        
+        if history:
+            context.add_history(history)
+        
         context.add_user(forward_message)
         tool_schemas = self._router.build_tool_schemas(agent.name)
         

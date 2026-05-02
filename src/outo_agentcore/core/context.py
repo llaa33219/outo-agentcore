@@ -49,3 +49,16 @@ class Context:
             tool_call_id=tool_call_id,
             tool_name=tool_name
         ))
+    
+    def add_history(self, history: list[dict]) -> None:
+        for msg in history:
+            if msg["type"] == "forward" and msg["sender"] == "user":
+                self._messages.append(ContextMessage(
+                    role="user",
+                    content=msg["content"]
+                ))
+            elif msg["type"] == "return" and msg["receiver"] == "user":
+                self._messages.append(ContextMessage(
+                    role="assistant",
+                    content=msg["content"]
+                ))

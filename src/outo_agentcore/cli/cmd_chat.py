@@ -8,8 +8,9 @@ from outo_agentcore.core.provider import Provider
 from outo_agentcore.core.router import Router
 from outo_agentcore.core.runtime import Runtime
 from outo_agentcore.core.tool import BashTool
+from outo_agentcore.core.wiki_tools import WikiRecordTool, WikiSearchTool
 from outo_agentcore.parser.agent_md import parse_agent_md
-from outo_agentcore.sessions.manager import SessionManager
+from outo_agentcore.sessions.manager import SessionManager, SessionLoadError
 
 
 def cmd_chat(args) -> None:
@@ -38,6 +39,7 @@ def cmd_chat(args) -> None:
             provider = config.providers.get(provider_name)
             default_model = provider.default_model if provider else ""
             model = parsed.get("model", default_model)
+            default_max_tokens = provider.max_output_tokens if provider else 0
             agents.append(Agent(
                 name=name,
                 instructions=parsed.get("instructions", ""),
@@ -45,6 +47,7 @@ def cmd_chat(args) -> None:
                 provider=provider_name,
                 role=parsed.get("role"),
                 temperature=parsed.get("temperature", 1.0),
+                max_output_tokens=parsed.get("max_output_tokens", default_max_tokens),
             ))
 
     if not agents:
@@ -52,6 +55,10 @@ def cmd_chat(args) -> None:
         return
 
     tools = [BashTool()]
+
+    if config.wiki.enabled:
+        tools.append(WikiRecordTool(config.wiki))
+        tools.append(WikiSearchTool(config.wiki))
 
     router = Router(agents, tools, providers)
     runtime = Runtime(router)
@@ -65,11 +72,37 @@ def cmd_chat(args) -> None:
         print(f"Error: {e}")
         return
 
-    result = asyncio.run(runtime.execute(args.message, entry_agent))
+    history_messages = []
+    prev_session = None
+    if args.session:
+        try:
+            prev_session = session_mgr.load(args.session)
+        except SessionLoadError as e:
+            print(f"Error: {e}")
+            return
+        
+        if prev_session:
+            all_msgs = prev_session.messages
+            max_messages = args.max_messages if args.max_messages is not None else config.max_recent_messages
+            if max_messages is not None:
+                all_msgs = all_msgs[-max_messages:]
+            history_messages = all_msgs
 
-    session = session_mgr.create(agent_name=args.agent)
-    session.messages = [asdict(m) for m in result.messages]
-    session_mgr.save(session)
+    result = asyncio.run(runtime.execute(args.message, entry_agent, history=history_messages))
+
+    if args.session and prev_session:
+        new_messages = result.messages[len(history_messages):]
+        prev_session.messages.extend([asdict(m) for m in new_messages])
+        session_mgr.save(prev_session)
+        session = prev_session
+    elif args.session:
+        session = session_mgr.create(agent_name=args.agent, session_id=args.session)
+        session.messages = [asdict(m) for m in result.messages]
+        session_mgr.save(session)
+    else:
+        session = session_mgr.create(agent_name=args.agent)
+        session.messages = [asdict(m) for m in result.messages]
+        session_mgr.save(session)
 
     print(result.output)
     print(f"\n--- Session: {session.session_id} ---")

@@ -62,6 +62,11 @@ class Router:
         parts.append("- call_agent: Call another agent.")
         parts.append("- finish: Return your final result to the caller.")
 
+        if "wiki_record" in self._tools:
+            parts.append("- wiki_record: Record information to the wiki knowledge base.")
+        if "wiki_search" in self._tools:
+            parts.append("- wiki_search: Search the wiki knowledge base for information.")
+
         parts.append("\nIMPORTANT: You MUST call the finish tool to return your final result.")
         parts.append("Plain text responses are NOT delivered to the caller.")
         parts.append("Use call_agent to delegate work to other agents.")
