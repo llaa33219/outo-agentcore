@@ -1,22 +1,21 @@
 # Provider Integration
 
-This document describes how to configure and use different LLM providers with outo-agentcore.
+This document describes how to configure LLM providers with outo-agentcore.
 
 ## Provider Overview
 
-Providers are LLM backends that agents use to generate responses. outo-agentcore supports any OpenAI-compatible API through the `openai` provider kind.
+Providers are configured in `~/.outoac/config.json` and passed to the [agentouto](https://github.com/llaa33219/agentouto) SDK, which handles all provider backends natively.
 
 ## Supported Providers
 
-| Provider | Base URL | Default Model | Notes |
-|----------|----------|---------------|-------|
-| OpenAI | `https://api.openai.com/v1` | `gpt-4o` | Official OpenAI API |
-| Anthropic | `https://api.anthropic.com/v1` | `claude-3-opus-20240229` | Via OpenAI-compatible proxy |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | `gemini-pro` | Via OpenAI-compatible proxy |
-| Ollama | `http://localhost:11434/v1` | `llama3` | Local inference |
-| LM Studio | `http://localhost:1234/v1` | (varies) | Local inference |
-| vLLM | `http://localhost:8000/v1` | (varies) | Local inference |
-| LiteLLM | `http://localhost:4000/v1` | (varies) | Proxy for multiple providers |
+agentouto supports these provider kinds natively:
+
+| Kind | Provider | Example Models | Compatible With |
+|------|----------|----------------|-----------------|
+| `"openai"` | OpenAI Chat Completions API | `gpt-5.2`, `gpt-5.3-codex`, `o3`, `o4-mini` | vLLM, Ollama, LM Studio, any OpenAI-compatible API |
+| `"openai_responses"` | OpenAI Responses API | `gpt-5.2`, `gpt-5.3-codex`, `o3`, `o4-mini` | — |
+| `"anthropic"` | Anthropic API | `claude-opus-4-6`, `claude-sonnet-4-6` | AWS Bedrock, Google Vertex AI, Ollama, LiteLLM |
+| `"google"` | Google Gemini API | `gemini-3.1-pro`, `gemini-3-flash` | — |
 
 ## Provider Configuration
 
@@ -29,7 +28,7 @@ Providers are LLM backends that agents use to generate responses. outo-agentcore
       "kind": "openai",
       "base_url": "https://api.openai.com/v1",
       "api_key": "sk-xxx",
-      "default_model": "gpt-4o",
+      "default_model": "gpt-5.5",
       "max_output_tokens": 0
     }
   }
@@ -40,11 +39,11 @@ Providers are LLM backends that agents use to generate responses. outo-agentcore
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `kind` | string | Yes | Provider backend type (currently only `openai`) |
+| `kind` | string | Yes | Provider kind: `openai`, `openai_responses`, `anthropic`, `google` |
 | `base_url` | string | Yes | API endpoint URL |
 | `api_key` | string | Yes | API authentication key |
 | `default_model` | string | Yes | Default model for agents |
-| `max_output_tokens` | integer | No | Max output tokens (0 = auto-detect) |
+| `max_output_tokens` | integer | No | Max output tokens (0 = auto-detect via LCW API) |
 
 ## Provider Setup Examples
 
@@ -54,7 +53,7 @@ Providers are LLM backends that agents use to generate responses. outo-agentcore
 outoac setup \
   --base-url https://api.openai.com/v1 \
   --api-key sk-xxx \
-  --default-model gpt-4o \
+  --default-model gpt-5.5 \
   --provider-name openai
 ```
 
@@ -67,7 +66,59 @@ Config:
       "kind": "openai",
       "base_url": "https://api.openai.com/v1",
       "api_key": "sk-xxx",
-      "default_model": "gpt-4o",
+      "default_model": "gpt-5.5",
+      "max_output_tokens": 0
+    }
+  }
+}
+```
+
+### Anthropic (Native)
+
+```bash
+outoac setup \
+  --base-url https://api.anthropic.com/v1 \
+  --api-key sk-ant-xxx \
+  --default-model claude-sonnet-4-6 \
+  --provider-name anthropic
+```
+
+Config:
+
+```json
+{
+  "providers": {
+    "anthropic": {
+      "kind": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "api_key": "sk-ant-xxx",
+      "default_model": "claude-sonnet-4-6",
+      "max_output_tokens": 0
+    }
+  }
+}
+```
+
+### Google Gemini (Native)
+
+```bash
+outoac setup \
+  --base-url https://generativelanguage.googleapis.com/v1beta \
+  --api-key AIza... \
+  --default-model gemini-3-1-pro \
+  --provider-name google
+```
+
+Config:
+
+```json
+{
+  "providers": {
+    "google": {
+      "kind": "google",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "api_key": "AIza...",
+      "default_model": "gemini-3-1-pro",
       "max_output_tokens": 0
     }
   }
@@ -80,7 +131,7 @@ Config:
 outoac setup \
   --base-url http://localhost:11434/v1 \
   --api-key ollama \
-  --default-model llama3 \
+  --default-model llama4:scout \
   --provider-name local
 ```
 
@@ -93,7 +144,7 @@ Config:
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "ollama",
-      "default_model": "llama3",
+      "default_model": "llama4:scout",
       "max_output_tokens": 0
     }
   }
@@ -126,39 +177,9 @@ Config:
 }
 ```
 
-### Anthropic (via Proxy)
-
-Since Anthropic uses a different API format, use a proxy like LiteLLM:
-
-```bash
-# Start LiteLLM proxy
-litellm --model claude-3-opus-20240229
-
-# Setup outo-agentcore
-outoac setup \
-  --base-url http://localhost:4000/v1 \
-  --api-key your-anthropic-key \
-  --default-model claude-3-opus-20240229 \
-  --provider-name anthropic
-```
-
-### Google Gemini (via Proxy)
-
-```bash
-# Start LiteLLM proxy
-litellm --model gemini-pro
-
-# Setup outo-agentcore
-outoac setup \
-  --base-url http://localhost:4000/v1 \
-  --api-key your-google-key \
-  --default-model gemini-pro \
-  --provider-name google
-```
-
 ## Multi-Provider Setup
 
-Configure multiple providers for different use cases:
+Configure multiple providers for different agents:
 
 ```json
 {
@@ -167,30 +188,38 @@ Configure multiple providers for different use cases:
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "ollama",
-      "default_model": "llama3",
+      "default_model": "llama4:scout",
       "max_output_tokens": 0
     },
     "openai": {
       "kind": "openai",
       "base_url": "https://api.openai.com/v1",
       "api_key": "sk-xxx",
-      "default_model": "gpt-4o",
+      "default_model": "gpt-5.5",
+      "max_output_tokens": 0
+    },
+    "anthropic": {
+      "kind": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "api_key": "sk-ant-xxx",
+      "default_model": "claude-sonnet-4-6",
       "max_output_tokens": 0
     }
   },
   "agents": {
     "main": "~/.outoac/agents/main.md",
-    "researcher": "~/.outoac/agents/researcher.md"
+    "researcher": "~/.outoac/agents/researcher.md",
+    "writer": "~/.outoac/agents/writer.md"
   }
 }
 ```
 
-Use different providers for different agents:
+Use different providers per agent via frontmatter:
 
 ```markdown
 ---
 provider: local
-model: llama3
+model: llama4:scout
 ---
 
 # Main Agent
@@ -199,34 +228,19 @@ You coordinate work using local models.
 
 ```markdown
 ---
-provider: openai
-model: gpt-4o
+provider: anthropic
+model: claude-sonnet-4-6
 ---
 
 # Researcher
-You research using powerful cloud models.
+You research using Anthropic models.
 ```
 
 ## Token Management
 
 ### Auto-Detection
 
-When `max_output_tokens` is `0`, the system automatically retrieves the optimal value from the [LCW API](https://lcw-api.blp.sh/context-window):
-
-```python
-def get_max_output_tokens(model: str, configured_tokens: int | None) -> int:
-    if configured_tokens and configured_tokens > 0:
-        return configured_tokens
-    try:
-        url = f"https://lcw-api.blp.sh/context-window?model={model}"
-        with urllib.request.urlopen(url, timeout=10) as response:
-            data = json.loads(response.read())
-            if data.get("success"):
-                return data["data"]["maxOutputTokens"]
-    except Exception:
-        pass
-    return 4000  # Fallback default
-```
+When `max_output_tokens` is `0`, agentouto automatically retrieves the optimal value from the [LCW API](https://lcw-api.blp.sh/context-window).
 
 ### Manual Configuration
 
@@ -241,7 +255,7 @@ Set specific token limits:
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "ollama",
-      "default_model": "llama3",
+      "default_model": "llama4:scout",
       "max_output_tokens": 4096
     }
   }
@@ -259,115 +273,6 @@ max_output_tokens: 8000
 You write long-form content.
 ```
 
-## Provider Backend Architecture
-
-### Backend Interface
-
-```python
-class ProviderBackend(ABC):
-    @abstractmethod
-    async def call(
-        self,
-        context: Context,
-        tools: list[dict],
-        agent: Agent,
-        provider: Provider,
-    ) -> LLMResponse
-```
-
-### OpenAI Backend
-
-The `OpenAIBackend` handles:
-
-1. **Client Management**: Caches `AsyncOpenAI` clients per provider
-2. **Message Conversion**: Converts `Context` to OpenAI message format
-3. **Tool Schema Conversion**: Converts tool schemas to OpenAI format
-4. **API Calls**: Makes async calls to OpenAI-compatible APIs
-5. **Response Parsing**: Parses responses into `LLMResponse`
-
-```python
-class OpenAIBackend(ProviderBackend):
-    def __init__(self) -> None:
-        self._clients: dict[str, AsyncOpenAI] = {}
-
-    def _get_client(self, provider: Provider) -> AsyncOpenAI:
-        key = (provider.api_key, provider.name)
-        if key not in self._clients:
-            kwargs: dict[str, Any] = {"api_key": provider.api_key}
-            if provider.base_url:
-                kwargs["base_url"] = provider.base_url
-            self._clients[key] = AsyncOpenAI(**kwargs)
-        return self._clients[key]
-```
-
-### Message Format Conversion
-
-Context messages are converted to OpenAI format:
-
-```python
-def _build_messages(context: Context) -> list[dict]:
-    messages = [{"role": "system", "content": context.system_prompt}]
-    
-    for msg in context.messages:
-        if msg.role == "user":
-            messages.append({"role": "user", "content": msg.content})
-        elif msg.role == "assistant":
-            if msg.tool_calls:
-                # Include tool calls
-                openai_tc = []
-                for tc in msg.tool_calls:
-                    openai_tc.append({
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments),
-                        },
-                    })
-                entry = {"role": "assistant", "tool_calls": openai_tc}
-                if msg.content:
-                    entry["content"] = msg.content
-                messages.append(entry)
-            else:
-                messages.append({"role": "assistant", "content": msg.content})
-        elif msg.role == "tool":
-            messages.append({
-                "role": "tool",
-                "tool_call_id": msg.tool_call_id,
-                "content": msg.content,
-            })
-    
-    return messages
-```
-
-## Error Handling
-
-### Common Errors
-
-**Authentication Error**:
-```
-Error: Invalid API key
-```
-**Solution**: Check your API key in the config.
-
-**Connection Error**:
-```
-Error: Connection refused
-```
-**Solution**: Ensure the provider is running and accessible.
-
-**Model Not Found**:
-```
-Error: Model not found
-```
-**Solution**: Check the model name and provider availability.
-
-**Rate Limiting**:
-```
-Error: Rate limit exceeded
-```
-**Solution**: Wait and retry, or upgrade your API plan.
-
 ## Best Practices
 
 ### 1. Use Local Models for Development
@@ -379,7 +284,7 @@ Error: Rate limit exceeded
       "kind": "openai",
       "base_url": "http://localhost:11434/v1",
       "api_key": "ollama",
-      "default_model": "llama3"
+      "default_model": "llama4:scout"
     }
   }
 }
@@ -394,7 +299,7 @@ Error: Rate limit exceeded
       "kind": "openai",
       "base_url": "https://api.openai.com/v1",
       "api_key": "sk-xxx",
-      "default_model": "gpt-4o"
+      "default_model": "gpt-5.5"
     }
   }
 }
@@ -405,7 +310,7 @@ Error: Rate limit exceeded
 ```markdown
 ---
 provider: local
-model: llama3
+model: llama4:scout
 temperature: 0.2
 ---
 
@@ -416,32 +321,12 @@ You handle simple, factual tasks.
 ```markdown
 ---
 provider: openai
-model: gpt-4o
+model: gpt-5.5
 temperature: 0.7
 ---
 
 # Complex Tasks Agent
 You handle complex reasoning and creative tasks.
-```
-
-### 4. Set Appropriate Token Limits
-
-```markdown
----
-max_output_tokens: 2000
----
-
-# Concise Agent
-You provide brief, focused responses.
-```
-
-```markdown
----
-max_output_tokens: 8000
----
-
-# Detailed Agent
-You provide comprehensive, detailed responses.
 ```
 
 ## Troubleshooting
@@ -460,26 +345,12 @@ Error: Provider not found: openai
 Error: Request timed out
 ```
 
-**Solution**: 
-- Check if the provider is running
-- Verify the base URL is correct
-- Check network connectivity
+**Solution**: Check if the provider is running and accessible.
 
-### Invalid response format
+### Authentication error
 
 ```
-Error: Invalid response from provider
+Error: Invalid API key
 ```
 
-**Solution**: Ensure the provider is OpenAI-compatible. Some providers may need a proxy.
-
-### Token limit exceeded
-
-```
-Error: Maximum context length exceeded
-```
-
-**Solution**:
-- Reduce `max_output_tokens`
-- Use `--max-messages` to limit session history
-- Use a model with larger context window
+**Solution**: Verify your API key in the config.

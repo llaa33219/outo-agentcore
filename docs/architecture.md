@@ -1,8 +1,18 @@
 # Architecture
 
-This document describes the system architecture and design principles of outo-agentcore.
+This document describes the system architecture of outo-agentcore.
 
 ## High-Level Overview
+
+outo-agentcore is a CLI wrapper around the [agentouto](https://github.com/llaa33219/agentouto) SDK. It handles:
+
+- **Configuration**: JSON-based config with providers, agents, and settings
+- **Agent Definitions**: Markdown files with YAML frontmatter
+- **Tools**: Custom tools (bash, wiki) using agentouto's `@Tool` decorator
+- **Sessions**: JSON-based conversation persistence
+- **CLI**: Simple command-line interface
+
+The heavy lifting (agent loops, LLM calls, tool dispatch, parallel execution, streaming, background agents) is all handled by agentouto.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -11,313 +21,119 @@ This document describes the system architecture and design principles of outo-ag
 │  │   setup   │  │   chat   │  │ sessions │                  │
 │  └──────────┘  └──────────┘  └──────────┘                  │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Core Layer                             │
+│                    outo-agentcore Layer                     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Router   │  │ Runtime  │  │  Agent   │  │ Context  │   │
+│  │  Config   │  │  Parser  │  │  Tools   │  │ Sessions │   │
+│  │  (JSON)   │  │ (agent   │  │(bash,    │  │  (JSON)  │   │
+│  │           │  │  md,     │  │ wiki)    │  │          │   │
+│  │           │  │ skills)  │  │          │  │          │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                 │
-│  │  Provider │  │   Tool   │  │ Message  │                 │
-│  └──────────┘  └──────────┘  └──────────┘                 │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Provider Layer                            │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │                OpenAI Backend                         │  │
-│  │  (OpenAI, Anthropic, Gemini, Ollama, LM Studio...)   │  │
-│  └──────────────────────────────────────────────────────┘  │
+│                      agentouto SDK                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │  Agent    │  │ Router   │  │ Runtime  │  │ Context  │   │
+│  │  Loop     │  │          │  │          │  │          │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌─────────────────────────┐  │
+│  │  Provider │  │   Tool   │  │  Provider Backends      │  │
+│  │  Backend  │  │  Dispatch│  │  (OpenAI, Anthropic,   │  │
+│  │  (multi)  │  │          │  │   Google, Responses)    │  │
+│  └──────────┘  └──────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Core Components
+## Components
 
-### Agent (`core/agent.py`)
+### CLI (`cli/`)
 
-The fundamental unit of work. Each agent has:
+- **main.py**: Argument parsing and command dispatch
+- **cmd_setup.py**: Creates `~/.outoac/config.json`
+- **cmd_chat.py**: Loads config, builds agentouto objects, calls `agentouto.run()`
+- **cmd_sessions.py**: Lists saved sessions
 
-- **name**: Unique identifier
-- **instructions**: System prompt defining behavior
-- **model**: LLM model to use
-- **provider**: Which provider backend to use
-- **role**: Optional short role description
-- **temperature**: Sampling temperature (0.0-2.0)
-- **max_output_tokens**: Maximum output tokens
+### Config (`config/`)
 
-```python
-@dataclass
-class Agent:
-    name: str
-    instructions: str
-    model: str
-    provider: str
-    role: str | None = None
-    max_output_tokens: int | None = None
-    temperature: float = 1.0
-    context_window: int | None = None
-```
+- **schema.py**: Dataclasses for config structure
+- **loader.py**: JSON load/save
 
-### Router (`core/router.py`)
+### Parser (`parser/`)
 
-The routing layer that:
+- **agent_md.py**: Parses agent markdown files into dicts
+- **skill_md.py**: Discovers and parses skill directories
 
-1. Manages agent, provider, and tool registries
-2. Builds system prompts for agents
-3. Constructs tool schemas for LLM calls
-4. Routes LLM calls to the appropriate provider backend
+### Tools (`tools/`)
 
-```python
-class Router:
-    def __init__(self, agents: list[Agent], tools: list, providers: list[Provider])
-    def get_agent(self, name: str) -> Agent
-    def get_provider(self, name: str) -> Provider
-    def get_tool(self, name: str)
-    def build_system_prompt(self, agent: Agent, caller: str | None = None) -> str
-    def build_tool_schemas(self, current_agent: str) -> list[dict]
-    async def call_llm(self, agent: Agent, context: Context, tool_schemas: list[dict]) -> LLMResponse
-```
+- **`__init__.py`**: `bash` tool via `@agentouto.Tool`, wiki tool factories
 
-### Runtime (`core/runtime.py`)
+Tools are created using agentouto's `@Tool` decorator or `Tool()` constructor. The SDK automatically generates JSON schemas from function signatures and docstrings.
 
-The execution engine that:
+### Sessions (`sessions/`)
 
-1. Manages the agent execution loop
-2. Handles tool call dispatch
-3. Manages agent-to-agent delegation
-4. Tracks message history
+- **manager.py**: JSON-based session persistence
 
-```python
-class Runtime:
-    def __init__(self, router: Router)
-    async def execute(self, forward_message: str, agent: Agent, history: list[dict] | None = None) -> RunResult
-```
-
-**Execution Flow**:
-1. User sends message to entry agent
-2. Runtime creates context with system prompt
-3. LLM is called with context and available tools
-4. If LLM returns tool calls:
-   - `call_agent`: Recursively execute target agent
-   - `bash`: Execute shell command
-   - `finish`: Return result to caller
-   - Other tools: Execute and return result
-5. If LLM returns text (no tools): Nudge to use `finish` tool
-6. Loop continues until `finish` is called
-
-### Context (`core/context.py`)
-
-Manages the conversation context for LLM calls:
-
-```python
-class Context:
-    def __init__(self, system_prompt: str)
-    def add_user(self, content: str) -> None
-    def add_assistant_text(self, content: str) -> None
-    def add_assistant_tool_calls(self, tool_calls: list[ToolCall], content: str | None = None) -> None
-    def add_tool_result(self, tool_call_id: str, tool_name: str, content: str) -> None
-    def add_history(self, history: list[dict]) -> None
-```
-
-### Message (`core/message.py`)
-
-Represents a message in the agent communication protocol:
-
-```python
-@dataclass
-class Message:
-    type: Literal["forward", "return"]  # Direction of message
-    sender: str                          # Who sent the message
-    receiver: str                        # Who receives the message
-    content: str                         # Message content
-    call_id: str                         # Unique call identifier
-```
-
-**Message Types**:
-- `forward`: Message from caller to callee
-- `return`: Message from callee to caller
-
-### Provider (`core/provider.py`)
-
-Represents an LLM provider configuration:
-
-```python
-@dataclass
-class Provider:
-    name: str
-    kind: str        # "openai" (currently only supported)
-    api_key: str
-    base_url: str | None = None
-```
-
-### Tool (`core/tool.py`)
-
-Base tool interface and built-in implementations:
-
-```python
-@dataclass
-class ToolResult:
-    content: str
-
-class BashTool:
-    name = "bash"
-    async def execute(self, command: str) -> ToolResult
-```
+Sessions store agentouto `Message` objects serialized as dicts.
 
 ## Data Flow
 
-### Single Agent Call
-
 ```
-User Message
-     │
-     ▼
-┌─────────┐
-│ Runtime  │
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│ Context  │ ← System Prompt + Message
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│  Router  │ ← Selects Provider
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│ Provider │ ← Calls LLM API
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│ Response │ ← Tool Calls or Text
-└────┬────┘
-     │
-     ├─→ finish → Return to User
-     ├─→ bash → Execute → Loop
-     └─→ call_agent → Recursive Call
-```
-
-### Multi-Agent Delegation
-
-```
-User → Main Agent
-           │
-           ├─→ call_agent("researcher", "Find info")
-           │         │
-           │         ▼
-           │    Researcher Agent
-           │         │
-           │         ├─→ bash("curl ...")
-           │         │
-           │         └─→ finish("Found: ...")
-           │
-           ├─→ call_agent("writer", "Write report")
-           │         │
-           │         ▼
-           │    Writer Agent
-           │         │
-           │         └─→ finish("Report: ...")
-           │
-           └─→ finish("Combined results: ...")
+User runs: outoac chat "Hello"
+    │
+    ▼
+cmd_chat.py
+    │
+    ├── Load config.json
+    ├── Parse agent markdown files
+    ├── Build agentouto.Provider list
+    ├── Build agentouto.Agent list
+    ├── Build agentouto.Tool list (bash, wiki?)
+    ├── Discover skills → extra_instructions
+    ├── Load session history (if --session)
+    │
+    ▼
+agentouto.run(
+    message="Hello",
+    starting_agents=[entry_agent],
+    run_agents=all_agents,
+    tools=tools,
+    providers=providers,
+    history=history,
+    extra_instructions=skills_text,
+    extra_instructions_scope="all",
+)
+    │
+    ▼
+Agent Loop (handled by agentouto SDK)
+    │
+    ▼
+RunResult with output + messages
+    │
+    ▼
+Save session messages to JSON
 ```
 
-## System Prompt Construction
+## What AgentOutO Handles
 
-The Router builds system prompts dynamically:
+All of these are provided by the agentouto SDK:
 
-```
-You are "agent_name". [Role or first 50 chars of instructions]
-
-INSTRUCTIONS:
-[Full instructions from agent definition]
-
-INVOKED BY: You have been called by 'caller_name'.
-Consider their request carefully and fulfill it.
-
-Available agents:
-- agent1: Role description
-- agent2: Role description
-
-Available tools:
-- bash: Execute a bash command and return its output.
-- call_agent: Call another agent.
-- finish: Return your final result to the caller.
-
-IMPORTANT: You MUST call the finish tool to return your final result.
-Plain text responses are NOT delivered to the caller.
-Use call_agent to delegate work to other agents.
-```
-
-## Provider Backend System
-
-Providers are implemented as backends:
-
-```python
-class ProviderBackend(ABC):
-    @abstractmethod
-    async def call(
-        self,
-        context: Context,
-        tools: list[dict],
-        agent: Agent,
-        provider: Provider,
-    ) -> LLMResponse
-```
-
-Currently implemented:
-- `OpenAIBackend`: Works with any OpenAI-compatible API
-
-The backend:
-1. Converts Context to provider-specific message format
-2. Converts tool schemas to provider-specific format
-3. Makes API call
-4. Parses response into `LLMResponse`
-
-## Session Persistence
-
-Sessions are stored as JSON files in `~/.outoac/sessions/`:
-
-```json
-{
-  "session_id": "abc123...",
-  "created_at": "2024-01-01T00:00:00Z",
-  "agent_name": "main",
-  "messages": [
-    {
-      "type": "forward",
-      "sender": "user",
-      "receiver": "main",
-      "content": "Hello",
-      "call_id": "xyz789..."
-    },
-    {
-      "type": "return",
-      "sender": "main",
-      "receiver": "user",
-      "content": "Hi there!",
-      "call_id": "xyz789..."
-    }
-  ]
-}
-```
-
-## Error Handling
-
-- `RoutingError`: Raised when agent, provider, or tool not found
-- `SessionLoadError`: Raised when session file is corrupted
-- Provider errors: Propagated from LLM API calls
-- Tool errors: Caught and returned as tool results
+- **Agent loops**: LLM call → tool dispatch → recursion → finish
+- **Parallel execution**: `asyncio.gather` for concurrent agent calls
+- **Provider backends**: OpenAI Chat Completions, OpenAI Responses, Anthropic, Google Gemini
+- **Tool schema generation**: Auto JSON schema from Python type hints
+- **Message protocol**: Forward/return with call_id tracking
+- **Self-summarization**: Auto context summarization at 70% threshold
+- **Streaming**: Token-by-token output with `async_run_stream`
+- **Background agents**: Isolated loops with message injection
+- **Debug mode**: Event logs and call tree traces
 
 ## Design Principles
 
-1. **Separation of Concerns**: Each component has a single responsibility
-2. **Provider Agnostic**: Core logic doesn't depend on specific LLM providers
-3. **Recursive Delegation**: Agents can call other agents without depth limits
-4. **Explicit Results**: Agents must use `finish` tool to return results
-5. **Session Continuity**: Conversations can be resumed across runs
+1. **Thin CLI Wrapper**: outo-agentcore handles config, parsing, and persistence. Agent execution is delegated to agentouto.
+2. **Markdown-First Agents**: Agent definitions are markdown files with optional YAML frontmatter.
+3. **JSON Config**: Simple JSON configuration for providers and settings.
+4. **Session Continuity**: Conversations can be resumed across runs.

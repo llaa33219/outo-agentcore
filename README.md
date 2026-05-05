@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>CLI agent tool based on <a href="https://github.com/llaa33219/agentouto">agentouto</a> SDK patterns</strong>
+  <strong>CLI agent tool powered by <a href="https://github.com/llaa33219/agentouto">agentouto</a> SDK</strong>
 </p>
 
 <p align="center">
@@ -17,9 +17,10 @@
 
 ## Features
 
-- **Agent support**: Agents can call each other recursively
+- **Powered by agentouto**: Full peer-to-peer multi-agent SDK with parallel execution, streaming, background agents
+- **Agent support**: Agents call each other recursively with no orchestrator
 - **Skills support**: [Agent Skills specification](https://agentskills.io/specification) compliant - reusable instruction packages
-- **OpenAI-compatible**: Works with OpenAI, MiniMax, Ollama, LM Studio, vLLM, etc.
+- **Multi-provider**: OpenAI, Anthropic, Google Gemini, and any OpenAI-compatible API (Ollama, vLLM, LM Studio, etc.)
 - **Session persistence**: Continue conversations across runs
 - **Bash execution**: Built-in shell command tool
 - **Wiki knowledge base**: Optional [OutoWiki](https://github.com/llaa33219/outowiki) integration for persistent knowledge management

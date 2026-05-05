@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>CLI agent tool based on <a href="https://github.com/llaa33219/agentouto">agentouto</a> SDK patterns</strong>
+  <strong>CLI agent tool powered by <a href="https://github.com/llaa33219/agentouto">agentouto</a> SDK</strong>
 </p>
 
 ## Table of Contents

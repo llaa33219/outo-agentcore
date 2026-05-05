@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers setting up the development environment, understanding the codebase, and contributing to outo-agentcore.
+This guide covers setting up the development environment and contributing to outo-agentcore.
 
 ## Development Setup
 
@@ -13,7 +13,7 @@ This guide covers setting up the development environment, understanding the code
 ### Clone Repository
 
 ```bash
-git clone https://github.com/your-org/outo-agentcore.git
+git clone https://github.com/llaa33219/outo-agentcore.git
 cd outo-agentcore
 ```
 
@@ -47,55 +47,35 @@ outo-agentcore/
 │       ├── __main__.py
 │       ├── cli/
 │       │   ├── __init__.py
-│       │   ├── main.py
-│       │   ├── cmd_chat.py
-│       │   ├── cmd_setup.py
-│       │   └── cmd_sessions.py
+│       │   ├── main.py          # CLI argument parsing
+│       │   ├── cmd_chat.py      # Chat command (uses agentouto.run)
+│       │   ├── cmd_setup.py     # Setup command
+│       │   └── cmd_sessions.py  # Sessions command
 │       ├── config/
 │       │   ├── __init__.py
-│       │   ├── loader.py
-│       │   └── schema.py
-│       ├── core/
-│       │   ├── __init__.py
-│       │   ├── agent.py
-│       │   ├── context.py
-│       │   ├── message.py
-│       │   ├── provider.py
-│       │   ├── router.py
-│       │   ├── runtime.py
-│       │   ├── token_utils.py
-│       │   └── wiki_tools.py
+│       │   ├── loader.py        # JSON config load/save
+│       │   └── schema.py        # Config dataclasses
 │       ├── parser/
 │       │   ├── __init__.py
-│       │   └── agent_md.py
-│       ├── providers/
+│       │   ├── agent_md.py      # Agent markdown parser
+│       │   └── skill_md.py      # Skill markdown parser
+│       ├── sessions/
 │       │   ├── __init__.py
-│       │   └── openai.py
-│       └── sessions/
-│           ├── __init__.py
-│           └── manager.py
+│       │   └── manager.py       # Session persistence
+│       └── tools/
+│           └── __init__.py      # Custom tools (bash, wiki)
 ├── tests/
-│   ├── __init__.py
-│   ├── conftest.py
-│   ├── test_agent.py
-│   ├── test_agent_md.py
-│   ├── test_bash_tool.py
 │   ├── test_config.py
-│   ├── test_context.py
-│   ├── test_integration.py
-│   ├── test_message.py
-│   ├── test_openai_provider.py
-│   ├── test_provider.py
-│   ├── test_providers.py
-│   ├── test_router.py
-│   ├── test_runtime.py
+│   ├── test_agent_md.py
 │   ├── test_sessions.py
-│   └── test_tool.py
+│   └── test_integration.py
 ├── docs/
 ├── pyproject.toml
 ├── README.md
 └── uv.lock
 ```
+
+The core agent execution engine is provided by the [agentouto](https://github.com/llaa33219/agentouto) SDK (listed as a dependency).
 
 ## Running Tests
 
@@ -105,143 +85,56 @@ outo-agentcore/
 uv run pytest tests/ -v
 ```
 
-### Run Specific Test File
-
-```bash
-uv run pytest tests/test_runtime.py -v
-```
-
 ### Run with Coverage
 
 ```bash
 uv run pytest tests/ --cov=outo_agentcore --cov-report=html
 ```
 
-### Run Async Tests
-
-Tests use `pytest-asyncio` with `asyncio_mode = "auto"`:
-
-```python
-@pytest.mark.asyncio
-async def test_execute_simple_finish():
-    # Test code here
-    pass
-```
-
 ## Code Architecture
 
-### Core Components
+### CLI Layer
 
-1. **Agent** (`core/agent.py`): Data class representing an agent
-2. **Router** (`core/router.py`): Routes calls between agents, providers, and tools
-3. **Runtime** (`core/runtime.py`): Executes agent loops and manages tool calls
-4. **Context** (`core/context.py`): Manages conversation context for LLM calls
-5. **Message** (`core/message.py`): Represents agent-to-agent messages
-6. **Provider** (`core/provider.py`): Provider configuration
-7. **Tool** (`core/tool.py`): Base tool interface and implementations
+The CLI is the entry point. `cmd_chat.py` is the most complex command:
 
-### Data Flow
-
-```
-User Input
-    │
-    ▼
-CLI (cmd_chat.py)
-    │
-    ▼
-Runtime.execute()
-    │
-    ▼
-Router.call_llm()
-    │
-    ▼
-Provider Backend (openai.py)
-    │
-    ▼
-LLM API
-    │
-    ▼
-Response Parsing
-    │
-    ▼
-Tool Execution (if needed)
-    │
-    ▼
-Result Return
-```
-
-## Adding New Features
+1. Load config from `~/.outoac/config.json`
+2. Parse agent markdown files into `agentouto.Agent` objects
+3. Build `agentouto.Provider` objects from config
+4. Create tools using `agentouto.Tool` decorator
+5. Discover skills and build `extra_instructions` string
+6. Load session history (if continuing)
+7. Call `agentouto.run()` with all parameters
+8. Save resulting messages to session
 
 ### Adding a New Tool
 
-1. Create tool class in `core/tool.py` or new file:
+Tools use agentouto's `@Tool` decorator:
 
 ```python
-class MyTool:
-    name = "my_tool"
-    description = "Description of what the tool does"
+import agentouto
 
-    def to_schema(self) -> dict[str, Any]:
-        return {
-            "name": "my_tool",
-            "description": self.description,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "param1": {
-                        "type": "string",
-                        "description": "Parameter description"
-                    }
-                },
-                "required": ["param1"]
-            }
-        }
-
-    async def execute(self, param1: str) -> ToolResult:
-        # Implementation
-        return ToolResult(content="Result")
+@agentouto.Tool
+def my_tool(param: str) -> str:
+    """Description shown to the LLM."""
+    return f"Result: {param}"
 ```
 
-2. Register tool in `cmd_chat.py`:
+Register in `cmd_chat.py`:
 
 ```python
-tools = [BashTool(), MyTool()]
+tools = [bash, my_tool]
 ```
 
-3. Add tool description to system prompt in `router.py`:
+For tools that need config access (like wiki tools), use a factory:
 
 ```python
-parts.append("- my_tool: Description of what the tool does.")
-```
-
-### Adding a New Provider Backend
-
-1. Create backend class in `providers/`:
-
-```python
-class MyBackend(ProviderBackend):
-    async def call(
-        self,
-        context: Context,
-        tools: list[dict],
-        agent: Agent,
-        provider: Provider,
-    ) -> LLMResponse:
-        # Implementation
-        pass
-```
-
-2. Register in `providers/__init__.py`:
-
-```python
-def get_backend(kind: str) -> ProviderBackend:
-    if kind == "openai":
-        from outo_agentcore.providers.openai import OpenAIBackend
-        return OpenAIBackend()
-    if kind == "my_provider":
-        from outo_agentcore.providers.my_provider import MyBackend
-        return MyBackend()
-    raise ValueError(f"Unknown provider backend: {kind}")
+def make_my_tool(settings):
+    @agentouto.Tool
+    def my_tool(param: str) -> str:
+        """Description."""
+        # Use settings here
+        return "result"
+    return my_tool
 ```
 
 ### Adding a New CLI Command
@@ -258,11 +151,9 @@ def cmd_mycommand(args):
 2. Register in `cli/main.py`:
 
 ```python
-# Add subparser
 mycommand_parser = subparsers.add_parser("mycommand", help="My command help")
 mycommand_parser.add_argument("--option", help="Option help")
 
-# Add to command dispatch
 elif args.command == "mycommand":
     from outo_agentcore.cli.cmd_mycommand import cmd_mycommand
     cmd_mycommand(args)
@@ -272,65 +163,33 @@ elif args.command == "mycommand":
 
 ### Test Structure
 
-Tests are organized by component:
-
-- `test_agent.py`: Agent data class tests
-- `test_context.py`: Context management tests
-- `test_message.py`: Message format tests
-- `test_provider.py`: Provider configuration tests
-- `test_router.py`: Router logic tests
-- `test_runtime.py`: Runtime execution tests
+- `test_config.py`: Config load/save tests
+- `test_agent_md.py`: Agent markdown parser tests
 - `test_sessions.py`: Session persistence tests
-- `test_tool.py`: Tool execution tests
-- `test_integration.py`: End-to-end integration tests
+- `test_integration.py`: CLI + agentouto integration tests (mocked)
 
-### Writing Tests
+### Writing Integration Tests
+
+Mock `agentouto.run` to test CLI behavior without real LLM calls:
 
 ```python
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from outo_agentcore.core.runtime import Runtime, RunResult
-from outo_agentcore.core.router import Router
-from outo_agentcore.core.agent import Agent
-from outo_agentcore.core.provider import Provider
-from outo_agentcore.core.tool import BashTool
-from outo_agentcore.providers import LLMResponse, ProviderBackend
+from unittest.mock import patch
+import agentouto
 
-class FakeBackend(ProviderBackend):
-    def __init__(self, responses):
-        self._responses = list(responses)
-        self._call_count = 0
-    
-    async def call(self, context, tools, agent, provider):
-        resp = self._responses[self._call_count]
-        self._call_count += 1
-        return resp
-
-@pytest.mark.asyncio
-async def test_execute_simple_finish():
-    """Agent calls finish immediately."""
-    agent = Agent(name="main", instructions="test", model="gpt-4", provider="openai")
-    provider = Provider(name="openai", kind="openai")
-    
-    backend = FakeBackend([
-        LLMResponse(tool_calls=[ToolCall(id="tc1", name="finish", arguments={"message": "Hello!"})])
-    ])
-    
-    router = Router([agent], [BashTool()], [provider])
-    with patch("outo_agentcore.core.router.get_backend", return_value=backend):
-        runtime = Runtime(router)
-        result = await runtime.execute("Hi", agent)
-    
-    assert result.output == "Hello!"
-    assert len(result.messages) == 2
+@patch("agentouto.run")
+def test_chat_basic(mock_run):
+    mock_run.return_value = agentouto.RunResult(
+        output="Hello",
+        messages=[...],
+    )
+    # Call cmd_chat and assert behavior
 ```
 
 ### Mocking Guidelines
 
-- Mock external dependencies (LLM APIs, file system)
-- Use `FakeBackend` for provider tests
-- Use `AsyncMock` for async functions
-- Use `patch` for module-level dependencies
+- Mock `agentouto.run` for integration tests
+- Mock file system using `tmp_path` fixture
+- Use `patch.dict("os.environ", {"HOME": ...})` for config paths
 
 ## Code Style
 
@@ -339,20 +198,13 @@ async def test_execute_simple_finish():
 - Follow PEP 8
 - Use type hints
 - Use dataclasses for data structures
-- Use async/await for async operations
 
 ### Naming Conventions
 
-- **Classes**: PascalCase (`Agent`, `Router`, `Runtime`)
-- **Functions**: snake_case (`execute`, `call_llm`, `build_system_prompt`)
-- **Variables**: snake_case (`agent_name`, `tool_schemas`)
-- **Constants**: UPPER_CASE (`CALL_AGENT`, `FINISH`)
-
-### Documentation
-
-- Use docstrings for public functions
-- Use comments for complex logic
-- Keep README and docs updated
+- **Classes**: PascalCase
+- **Functions**: snake_case
+- **Variables**: snake_case
+- **Constants**: UPPER_CASE
 
 ## Debugging
 
@@ -362,39 +214,18 @@ async def test_execute_simple_finish():
 outoac chat "message" --debug
 ```
 
-### Debug Logging
-
-Add debug logging in your code:
-
-```python
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-logger.debug("Debug message")
-logger.info("Info message")
-logger.error("Error message")
-```
+This passes `debug=True` to `agentouto.run()`, enabling event logs and traces.
 
 ### Common Issues
 
 **Import Errors**:
 ```bash
-# Ensure package is installed in development mode
 uv sync
 ```
 
 **Test Failures**:
 ```bash
-# Run specific test with verbose output
-uv run pytest tests/test_runtime.py -v -s
-```
-
-**Async Issues**:
-```bash
-# Ensure pytest-asyncio is installed
-uv add --dev pytest-asyncio
+uv run pytest tests/test_integration.py -v -s
 ```
 
 ## Contributing
@@ -420,13 +251,6 @@ test: Add tests
 refactor: Refactor code
 ```
 
-### Pull Request Guidelines
-
-- Include description of changes
-- Reference related issues
-- Ensure all tests pass
-- Update documentation if needed
-
 ## Release Process
 
 ### Version Bumping
@@ -435,7 +259,7 @@ Update version in `pyproject.toml`:
 
 ```toml
 [project]
-version = "0.2.0"
+version = "0.3.0"
 ```
 
 ### Building
@@ -454,7 +278,7 @@ uv publish
 
 ### Core Dependencies
 
-- `openai>=1.50.0`: OpenAI API client
+- `agentouto>=0.27.0`: Multi-agent SDK (peer-to-peer agent communication)
 - `outowiki>=0.7.8`: OutoWiki integration
 
 ### Development Dependencies
@@ -475,7 +299,7 @@ uv add --dev new-package
 
 ## Resources
 
+- [agentouto SDK](https://github.com/llaa33219/agentouto)
 - [Python Documentation](https://docs.python.org/3/)
-- [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
 - [pytest Documentation](https://docs.pytest.org/)
 - [uv Documentation](https://github.com/astral-sh/uv)

@@ -1,112 +1,188 @@
-import pytest
 import json
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
-from outo_agentcore.config.schema import AppConfig, ProviderConfig
+from unittest.mock import patch, MagicMock
+
+import agentouto
+import pytest
+
 from outo_agentcore.config.loader import save_config
-from outo_agentcore.core.agent import Agent
-from outo_agentcore.core.provider import Provider
-from outo_agentcore.core.tool import BashTool
-from outo_agentcore.core.router import Router
-from outo_agentcore.core.runtime import Runtime
-from outo_agentcore.core.context import ToolCall
-from outo_agentcore.providers import LLMResponse, ProviderBackend
+from outo_agentcore.config.schema import AppConfig, ProviderConfig
 from outo_agentcore.sessions.manager import SessionManager
-from outo_agentcore.parser.agent_md import parse_agent_md
 
-class FakeBackend(ProviderBackend):
-    def __init__(self, responses):
-        self._responses = list(responses)
-        self._call_count = 0
-    
-    async def call(self, context, tools, agent, provider):
-        resp = self._responses[self._call_count]
-        self._call_count += 1
-        return resp
 
-@pytest.mark.asyncio
-async def test_full_flow_mock_llm(tmp_path):
+class Args:
+    def __init__(self, message="Hello", session=None, agent="main", max_messages=None, debug=False):
+        self.message = message
+        self.session = session
+        self.agent = agent
+        self.max_messages = max_messages
+        self.debug = debug
+
+
+@pytest.fixture
+def setup_config(tmp_path):
     config_dir = tmp_path / ".outoac"
     config_dir.mkdir()
-    
-    agent_md = config_dir / "agents" / "main.md"
-    agent_md.parent.mkdir(parents=True)
-    agent_md.write_text("# Test Agent\n\nYou are a test agent.")
-    
+
+    agents_dir = config_dir / "agents"
+    agents_dir.mkdir()
+
+    main_md = agents_dir / "main.md"
+    main_md.write_text("# Main Agent\n\nYou are the main coordinator.")
+
     config = AppConfig(
-        providers={"default": ProviderConfig(kind="openai", api_key="test", default_model="gpt-4")},
-        agents={"main": str(agent_md)},
+        providers={
+            "default": ProviderConfig(
+                kind="openai", base_url="http://localhost:11434/v1", api_key="test-key", default_model="llama4:scout"
+            )
+        },
+        agents={"main": str(main_md)},
         default_agent="main",
-        skills_dir=str(config_dir / "skills")
+        skills_dir=str(config_dir / "skills"),
     )
     save_config(config_dir / "config.json", config)
-    
-    parsed = parse_agent_md(agent_md)
-    assert parsed["role"] == "Test Agent"
-    assert "test agent" in parsed["instructions"]
-    
-    provider = Provider(name="default", kind="openai", api_key="test")
-    agent = Agent(
-        name="main",
-        instructions=parsed["instructions"],
-        model="gpt-4",
-        provider="default",
-        role=parsed["role"]
+
+    return config_dir
+
+
+@patch("agentouto.run")
+def test_chat_basic(mock_run, setup_config, capsys):
+    mock_run.return_value = agentouto.RunResult(
+        output="Hello from agent",
+        messages=[
+            agentouto.Message(type="forward", sender="user", receiver="main", content="Hello"),
+            agentouto.Message(type="return", sender="main", receiver="user", content="Hello from agent"),
+        ],
     )
-    
-    backend = FakeBackend([
-        LLMResponse(tool_calls=[ToolCall(id="tc1", name="finish", arguments={"message": "Integration test passed"})])
-    ])
-    
-    router = Router([agent], [BashTool()], [provider])
-    with patch("outo_agentcore.core.router.get_backend", return_value=backend):
-        runtime = Runtime(router)
-        result = await runtime.execute("Test message", agent)
-    
-    assert result.output == "Integration test passed"
-    
-    sessions_dir = config_dir / "sessions"
-    session_mgr = SessionManager(sessions_dir)
+
+    from outo_agentcore.cli.cmd_chat import cmd_chat
+
+    with patch.dict("os.environ", {"HOME": str(setup_config.parent)}):
+        cmd_chat(Args(message="Hello"))
+
+    captured = capsys.readouterr()
+    assert "Hello from agent" in captured.out
+    assert "Session:" in captured.out
+
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["message"] == "Hello"
+    assert len(call_kwargs["starting_agents"]) == 1
+    assert call_kwargs["starting_agents"][0].name == "main"
+    assert call_kwargs["debug"] is False
+
+
+@patch("agentouto.run")
+def test_chat_with_session(mock_run, setup_config, capsys):
+    session_mgr = SessionManager(setup_config / "sessions")
     session = session_mgr.create(agent_name="main")
-    session.messages = [{"output": result.output}]
-    session_mgr.save(session)
-    
-    loaded = session_mgr.load(session.session_id)
-    assert loaded is not None
-    assert loaded.messages[0]["output"] == "Integration test passed"
-
-@pytest.mark.asyncio
-async def test_multi_agent_flow():
-    a1 = Agent(name="main", instructions="Main agent", model="gpt-4", provider="openai")
-    a2 = Agent(name="researcher", instructions="Research agent", model="gpt-4", provider="openai")
-    provider = Provider(name="openai", kind="openai")
-    
-    backend = FakeBackend([
-        LLMResponse(tool_calls=[ToolCall(id="tc1", name="call_agent", arguments={"agent_name": "researcher", "message": "Find info"})]),
-        LLMResponse(tool_calls=[ToolCall(id="tc2", name="finish", arguments={"message": "Research complete"})]),
-        LLMResponse(tool_calls=[ToolCall(id="tc3", name="finish", arguments={"message": "Got: Research complete"})])
-    ])
-    
-    router = Router([a1, a2], [BashTool()], [provider])
-    with patch("outo_agentcore.core.router.get_backend", return_value=backend):
-        runtime = Runtime(router)
-        result = await runtime.execute("Research task", a1)
-    
-    assert "Research complete" in result.output
-    assert len(result.messages) == 4
-
-def test_session_continuation(tmp_path):
-    session_mgr = SessionManager(tmp_path)
-    
-    session1 = session_mgr.create(agent_name="main")
-    session1.messages = [
-        {"type": "forward", "sender": "user", "receiver": "main", "content": "Hello"},
-        {"type": "return", "sender": "main", "receiver": "user", "content": "Hi there"}
+    session.messages = [
+        {"type": "forward", "sender": "user", "receiver": "main", "content": "Previous message", "call_id": "abc"},
+        {"type": "return", "sender": "main", "receiver": "user", "content": "Previous response", "call_id": "def"},
     ]
-    session_mgr.save(session1)
-    
-    loaded = session_mgr.load(session1.session_id)
-    assert loaded is not None
-    assert len(loaded.messages) == 2
-    assert loaded.messages[0]["content"] == "Hello"
-    assert loaded.messages[1]["content"] == "Hi there"
+    session_mgr.save(session)
+
+    mock_run.return_value = agentouto.RunResult(
+        output="Follow-up response",
+        messages=[
+            agentouto.Message(type="forward", sender="user", receiver="main", content="Previous message"),
+            agentouto.Message(type="return", sender="main", receiver="user", content="Previous response"),
+            agentouto.Message(type="forward", sender="user", receiver="main", content="Follow-up"),
+            agentouto.Message(type="return", sender="main", receiver="user", content="Follow-up response"),
+        ],
+    )
+
+    from outo_agentcore.cli.cmd_chat import cmd_chat
+
+    with patch.dict("os.environ", {"HOME": str(setup_config.parent)}):
+        cmd_chat(Args(message="Follow-up", session=session.session_id))
+
+    captured = capsys.readouterr()
+    assert "Follow-up response" in captured.out
+
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["history"] is not None
+    assert len(call_kwargs["history"]) == 2
+
+
+@patch("agentouto.run")
+def test_chat_with_wiki(mock_run, setup_config, capsys):
+    config_dir = setup_config
+    config_path = config_dir / "config.json"
+    data = json.loads(config_path.read_text())
+    data["wiki"] = {
+        "enabled": True,
+        "wiki_path": str(config_dir / "wiki"),
+        "provider": "default",
+        "model": "",
+        "api_key": "",
+        "base_url": "",
+        "max_output_tokens": 0,
+        "debug": False,
+    }
+    config_path.write_text(json.dumps(data))
+
+    mock_run.return_value = agentouto.RunResult(
+        output="Wiki enabled",
+        messages=[
+            agentouto.Message(type="forward", sender="user", receiver="main", content="Hello"),
+            agentouto.Message(type="return", sender="main", receiver="user", content="Wiki enabled"),
+        ],
+    )
+
+    from outo_agentcore.cli.cmd_chat import cmd_chat
+
+    with patch.dict("os.environ", {"HOME": str(config_dir.parent)}):
+        cmd_chat(Args(message="Hello"))
+
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args.kwargs
+    tools = call_kwargs["tools"]
+    tool_names = [t.name for t in tools]
+    assert "bash" in tool_names
+    assert "wiki_record" in tool_names
+    assert "wiki_search" in tool_names
+
+
+@patch("agentouto.run")
+def test_chat_skills_in_extra_instructions(mock_run, setup_config, capsys):
+    config_dir = setup_config
+    skills_dir = config_dir / "skills"
+    skills_dir.mkdir()
+
+    skill_dir = skills_dir / "test-skill"
+    skill_dir.mkdir()
+    skill_md = skill_dir / "SKILL.md"
+    skill_md.write_text("---\nname: test-skill\ndescription: A test skill for testing.\n---\n# Instructions\nDo testing.")
+
+    mock_run.return_value = agentouto.RunResult(
+        output="Done",
+        messages=[
+            agentouto.Message(type="forward", sender="user", receiver="main", content="Hello"),
+            agentouto.Message(type="return", sender="main", receiver="user", content="Done"),
+        ],
+    )
+
+    from outo_agentcore.cli.cmd_chat import cmd_chat
+
+    with patch.dict("os.environ", {"HOME": str(config_dir.parent)}):
+        cmd_chat(Args(message="Hello"))
+
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args.kwargs
+    assert call_kwargs["extra_instructions"] is not None
+    assert "test-skill" in call_kwargs["extra_instructions"]
+    assert call_kwargs["extra_instructions_scope"] == "all"
+
+
+@patch("agentouto.run")
+def test_chat_no_config(mock_run, capsys):
+    from outo_agentcore.cli.cmd_chat import cmd_chat
+
+    with patch.dict("os.environ", {"HOME": "/nonexistent_home_12345"}):
+        cmd_chat(Args(message="Hello"))
+
+    captured = capsys.readouterr()
+    assert "No config found" in captured.out
+    mock_run.assert_not_called()
