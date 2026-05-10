@@ -4,8 +4,21 @@ This document describes all configuration options for outo-agentcore.
 
 ## Configuration File Location
 
-```
-~/.outoac/config.json
+Default: `~/.outoac/config.json`
+
+Override with:
+- **CLI argument**: `--config` or `-c` (highest priority)
+- **Environment variable**: `OUTOAC_CONFIG`
+- **Default**: `~/.outoac/config.json`
+
+```bash
+# Use custom config path
+outoac --config /path/to/config.json chat "Hello"
+outoac -c ./my-config.json setup --base-url http://localhost:11434/v1
+
+# Or set via environment variable
+export OUTOAC_CONFIG=/path/to/config.json
+outoac chat "Hello"
 ```
 
 ## Configuration Schema

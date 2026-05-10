@@ -118,6 +118,12 @@ outoac chat "Tell me more" --session <session-id>
 | `outoac chat "message" --agent <name>` | Use specific agent |
 | `outoac sessions` | List all sessions |
 
+### Global Options
+
+| Argument | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `--config`, `-c` | Path to config.json | `~/.outoac/config.json` | `./my-config.json` |
+
 ### Setup Options
 
 | Argument | Description | Default | Example |
@@ -146,7 +152,18 @@ outoac chat "Tell me more" --session <session-id>
 
 ## Configuration
 
-Config file: `~/.outoac/config.json`
+Default config file: `~/.outoac/config.json`
+
+Override with `--config` flag or `OUTOAC_CONFIG` environment variable:
+
+```bash
+# Use custom config
+outoac --config ./project-config.json chat "Hello"
+
+# Or via environment variable
+export OUTOAC_CONFIG=./project-config.json
+outoac chat "Hello"
+```
 
 ```json
 {
