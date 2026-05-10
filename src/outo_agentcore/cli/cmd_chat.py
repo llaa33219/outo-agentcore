@@ -20,9 +20,9 @@ def cmd_chat(args) -> None:
     else:
         agentouto_logger.setLevel(logging.ERROR)
 
-    config_path = Path.home() / ".outoac" / "config.json"
+    config_path = getattr(args, "config_path", None) or Path.home() / ".outoac" / "config.json"
     if not config_path.exists():
-        print("Error: No config found. Run 'outoac setup' first.")
+        print(f"Error: Config not found at {config_path}. Run 'outoac setup' first.")
         return
 
     config = load_config(config_path)

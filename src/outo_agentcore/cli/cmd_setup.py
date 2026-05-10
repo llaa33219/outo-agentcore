@@ -3,9 +3,8 @@ from outo_agentcore.config.schema import AppConfig, ProviderConfig
 from outo_agentcore.config.loader import load_config, save_config
 
 def cmd_setup(args):
-    config_dir = Path.home() / ".outoac"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "config.json"
+    config_path = getattr(args, "config_path", None) or Path.home() / ".outoac" / "config.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
 
     if config_path.exists():
         config = load_config(config_path)
@@ -13,7 +12,7 @@ def cmd_setup(args):
         config = AppConfig(
             providers={},
             agents={},
-            skills_dir=str(config_dir / "skills")
+            skills_dir=str(config_path.parent / "skills")
         )
 
     if args.base_url or args.api_key or args.default_model:

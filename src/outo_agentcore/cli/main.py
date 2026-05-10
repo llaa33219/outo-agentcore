@@ -1,10 +1,26 @@
 import argparse
+import os
 import sys
+from pathlib import Path
+
+DEFAULT_CONFIG_PATH = Path.home() / ".outoac" / "config.json"
+
+def _resolve_config_path(args_config: str | None) -> Path:
+    if args_config:
+        return Path(args_config)
+    env_config = os.environ.get("OUTOAC_CONFIG")
+    if env_config:
+        return Path(env_config)
+    return DEFAULT_CONFIG_PATH
 
 def main():
     parser = argparse.ArgumentParser(
         prog="outoac",
         description="outo-agentcore: CLI multi-agent tool"
+    )
+    parser.add_argument(
+        "--config", "-c",
+        help="Path to config.json (default: ~/.outoac/config.json, env: OUTOAC_CONFIG)"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -30,6 +46,7 @@ def main():
     sessions_parser.add_argument("--limit", type=int, default=10, help="Max sessions to show")
 
     args = parser.parse_args()
+    args.config_path = _resolve_config_path(args.config)
 
     if args.command == "setup":
         from outo_agentcore.cli.cmd_setup import cmd_setup

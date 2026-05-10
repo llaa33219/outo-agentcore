@@ -184,5 +184,5 @@ def test_chat_no_config(mock_run, capsys):
         cmd_chat(Args(message="Hello"))
 
     captured = capsys.readouterr()
-    assert "No config found" in captured.out
+    assert "Config not found" in captured.out
     mock_run.assert_not_called()
